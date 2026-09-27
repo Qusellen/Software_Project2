@@ -1,26 +1,18 @@
-oid setup() {
+void setup() {
   pinMode(7, OUTPUT);
 }
 
 void loop() {
-
-  // 1 секунд асаалттай
-  digitalWrite(7, LOW);
+  digitalWrite(7, LOW); //// 1초 동안 켜짐 (Active-Low 방식: LOW = ON)
   delay(1000);
 
-  // 1 секундийн турш 5 удаа анивчина
-  for (int i = 0; i < 5; i++) {
+  for (int i = 0; i < 5; i++) { //// 1초 동안 5번 깜빡임
     digitalWrite(7, HIGH);
     delay(100);
 
     digitalWrite(7, LOW);
     delay(100);
   }
-
-  // эцэст нь унтарна
-  digitalWrite(7, HIGH);
-
-  // дахиж ажиллахгүй
-  while (true) {
-  }
+  digitalWrite(7, HIGH); //// 마지막에 꺼짐 (Active-Low 방식: HIGH = OFF)
+  while (true); //// 더 이상 실행되지 않음
 }
