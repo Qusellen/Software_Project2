@@ -1,81 +1,79 @@
-// Arduino pin assignment
-#define PIN_LED  9
-#define PIN_TRIG 12   // sonar sensor TRIGGER
-#define PIN_ECHO 13   // sonar sensor ECHO
+// 핀 설정 (이전 실습과 동일하다고 가정)
+#define PIN_TRIG 12
+#define PIN_ECHO 13
+#define PIN_LED 9
 
-// configurable parameters
-#define SND_VEL 346.0     // sound velocity at 24 celsius degree (unit: m/sec)
-#define INTERVAL 25      // sampling interval (unit: msec)
-#define PULSE_DURATION 10 // ultra-sound Pulse Duration (unit: usec)
-#define _DIST_MIN 100.0   // minimum distance to be measured (unit: mm)
-#define _DIST_MAX 300.0   // maximum distance to be measured (unit: mm)
+// 거리 제한 값 설정
+#define _DIST_MIN 100.0
+#define _DIST_MAX 300.0
 
-#define TIMEOUT ((INTERVAL / 2) * 1000.0) // maximum echo waiting time (unit: usec)
-#define SCALE (0.001 * 0.5 * SND_VEL) // coefficent to convert duration to distance
+// 샘플링 주기를 25ms로 변경
+#define INTERVAL 25 
 
-unsigned long last_sampling_time;   // unit: msec
+unsigned long last_sampling_time = 0; // 단위: msec
 
-void setup() {
-  // initialize GPIO pins
-  pinMode(PIN_LED, OUTPUT);
-  pinMode(PIN_TRIG, OUTPUT);  // sonar TRIGGER
-  pinMode(PIN_ECHO, INPUT);   // sonar ECHO
-  digitalWrite(PIN_TRIG, LOW);  // turn-off Sonar 
-  
-  // initialize serial port
-  Serial.begin(57600);
-}
-
-void loop() { 
-  float distance;
-
-  // wait until next sampling time. // polling
-  // millis() returns the number of milliseconds since the program started.
-  //    will overflow after 50 days.
-  if (millis() < (last_sampling_time + INTERVAL))
-    return;
-
-  distance = USS_measure(PIN_TRIG, PIN_ECHO); // read distance
-
-  if ((distance == 0.0) || (distance > _DIST_MAX)) {
-      distance = _DIST_MAX + 10.0;    // Set Higher Value
-      digitalWrite(PIN_LED, 1);       // LED OFF
-  } else if (distance < _DIST_MIN) {
-      distance = _DIST_MIN - 10.0;    // Set Lower Value
-      digitalWrite(PIN_LED, 1);       // LED OFF
-  } else {    // In desired Range
-      digitalWrite(PIN_LED, 0);       // LED ON      
-  }
-
-  // output the distance to the serial port
-  Serial.print("Min:");        Serial.print(_DIST_MIN);
-  Serial.print(",distance:");  Serial.print(distance);
-  Serial.print(",Max:");       Serial.print(_DIST_MAX);
-  Serial.println("");
-  
-  // do something here
-  delay(50); // Assume that it takes 50ms to do something.
-  
-  // update last sampling time
-  last_sampling_time += INTERVAL;
-}
-
-// get a distance reading from USS. return value is in millimeter.
-float USS_measure(int TRIG, int ECHO)
-{
+// 거리 측정 함수 (기본 제공 함수)
+float USS_measure(int TRIG, int ECHO) {
   digitalWrite(TRIG, HIGH);
-  delayMicroseconds(PULSE_DURATION);
+  delayMicroseconds(10);
   digitalWrite(TRIG, LOW);
   
-  return pulseIn(ECHO, HIGH, TIMEOUT) * SCALE; // unit: mm
+  // 수신된 초음파의 시간을 마이크로초 단위로 측정
+  long duration = pulseIn(ECHO, HIGH, 50000); 
+  if (duration == 0) return 0.0;
+  
+  // 시간을 밀리미터(mm)로 변환 (음속 340m/s)
+  return (duration * 340.0) / 2.0 / 1000.0; 
+}
 
-  // Pulse duration to distance conversion example (target distance = 17.3m)
-  // - pulseIn(ECHO, HIGH, timeout) returns microseconds (음파의 왕복 시간)
-  // - 편도 거리 = (pulseIn() / 1,000,000) * SND_VEL / 2 (미터 단위)
-  //   mm 단위로 하려면 * 1,000이 필요 ==>  SCALE = 0.001 * 0.5 * SND_VEL
-  //
-  // - 예, pusseIn()이 100,000 이면 (= 0.1초, 왕복 거리 34.6m)
-  //        = 100,000 micro*sec * 0.001 milli/micro * 0.5 * 346 meter/sec
-  //        = 100,000 * 0.001 * 0.5 * 346
-  //        = 17,300 mm  ==> 17.3m
+void setup() {
+  pinMode(PIN_LED, OUTPUT);
+  pinMode(PIN_TRIG, OUTPUT);
+  digitalWrite(PIN_TRIG, LOW);
+  pinMode(PIN_ECHO, INPUT);
+  
+  digitalWrite(PIN_LED, HIGH); // 초기 상태에서 LED 끄기 (Active low이므로 HIGH/255 적용)
+  Serial.begin(57600); // 시리얼 모니터 및 플로터 통신 속도
+}
+
+void loop() {
+  float distance;
+  int led_brightness = 255; // 기본값: 완전히 꺼짐 (Active Low)
+
+  // Polling: 다음 샘플링 시간까지 대기
+  if (millis() < (last_sampling_time + INTERVAL)) {
+    return;
+  }
+
+  // 거리 측정
+  distance = USS_measure(PIN_TRIG, PIN_ECHO);
+
+  // --- 거리에 따른 LED 밝기 계산 ---
+  if (distance >= 100.0 && distance <= 200.0) {
+    // 100mm(255: 꺼짐) -> 200mm(0: 최대 밝기) 구간 선형 비례
+    led_brightness = 255 - (int)((distance - 100.0) * 255.0 / 100.0);
+  } 
+  else if (distance > 200.0 && distance <= 300.0) {
+    // 200mm(0: 최대 밝기) -> 300mm(255: 꺼짐) 구간 선형 비례
+    led_brightness = (int)((distance - 200.0) * 255.0 / 100.0);
+  } 
+  else {
+    // 100mm 미만 또는 300mm 초과 거리에서는 꺼짐
+    led_brightness = 255; 
+  }
+
+  // 계산 오류 방지를 위해 PWM 값을 0에서 255 사이로 제한
+  led_brightness = constrain(led_brightness, 0, 255);
+
+  // LED에 밝기 값 출력
+  analogWrite(PIN_LED, led_brightness);
+
+  // 시리얼 플로터 출력을 위한 부분
+  Serial.print("Min:"); Serial.print(_DIST_MIN);
+  Serial.print(", distance:"); Serial.print(distance);
+  Serial.print(", Max:"); Serial.print(_DIST_MAX);
+  Serial.println("");
+
+  // 마지막 샘플링 시간 업데이트
+  last_sampling_time += INTERVAL;
 }
