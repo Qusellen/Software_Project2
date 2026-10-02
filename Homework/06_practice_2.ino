@@ -32,7 +32,7 @@ void generate_pwm() {
 void setup() {
   pinMode(LED_PIN, OUTPUT);
   digitalWrite(LED_PIN, HIGH);
-  set_period(1000); //10ms (10000us), 1ms (1000us), 0.1ms (100us)
+  set_period(10000); //10ms (10000us), 1ms (1000us), 0.1ms (100us)
 }
 
 void loop() {
