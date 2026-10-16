@@ -59,7 +59,7 @@ float USS_measure(int TRIG, int ECHO) {
 // smoothly moving the shutter using a sigmoid function
 void moveBarrierSigmoid(int startAngle, int stopAngle) {
   for(int i = 0; i <= 50; i++) {
-    float x =- 6.0 + (12.0 * i/50.0);
+    float x =- 6.0 + (12.0 * i / 50.0);
     float sigmoidValue = 1.0 / (1.0 + exp(-x));
     int angle = startAngle + (stopAngle - startAngle) * sigmoidValue;
 
